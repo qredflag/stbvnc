@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+
+<html>
+<header>
+    <script>
+        function guess_dimension(pixels) {
+            switch (pixels) {
+                case 414720:
+                    return {w: 720, h: 576};
+                case 921600:
+                    return {w: 1280, h: 720};
+                case 2073600:
+                    return {w: 1920, h: 1080};
+            }
+            return null;
+        }
+
+        function get_scale_factor(dimension) {
+            switch (dimension.w) {
+                case 720:
+                    return 1;
+                case 1280:
+                    return 720 / 1280;
+                case 1920:
+                    return 720 / 1920;
+            }
+
+            return null;
+        }
+
+        function display_image(data)
+        {
+            var data_array = new Uint8Array(data);
+            var dimension = guess_dimension(data_array.byteLength/2/4);
+            if (!dimension) {
+                console.log("Warning: unknown dimension")
+                return ;
+            }
+
+            var canvas = document.getElementById('canvas');
+            var ctx = canvas.getContext('2d');
+
+            var idata = ctx.createImageData(dimension.w, dimension.h);
+
+            for (var i = 0; i < dimension.w * dimension.h * 4; i += 4) {
+                idata.data[i] = data_array[i + 2];
+                idata.data[i + 1] = data_array[i + 1];
+                idata.data[i + 2] = data_array[i];
+                idata.data[i + 3] = data_array[i + 3];
+            }
+
+            var offscreen_canvas =  document.createElement('canvas');
+            offscreen_canvas.width = dimension.w;
+            offscreen_canvas.height = dimension.h;
+            offscreen_canvas.getContext("2d").putImageData(idata, 0, 0);
+
+            var sfactor = get_scale_factor(dimension);
+            ctx.drawImage(offscreen_canvas, 0, 0, dimension.w, dimension.h, 0, 0, 720, dimension.h * sfactor);
+        }
+
+        function load_image()
+        {
+            var xhttp = new XMLHttpRequest();
+
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    display_image(this.response);
+                }
+            };
+            xhttp.open("GET", "/fb", true);
+            xhttp.responseType = "arraybuffer";
+            xhttp.send();
+        }
+
+        function reload_screen()
+        {
+            load_image();
+
+            setInterval(function(){
+                load_image();
+            }, 2000);
+        }
+
+        function init()
+        {
+            document.keystrokes = [];
+            document.keystrokes["ArrowLeft"] = {keystroke : "0x01000012", type: "1"};
+            document.keystrokes["ArrowRight"] = {keystroke : "0x01000014", type: "1"};
+            document.keystrokes["ArrowUp"] = {keystroke : "0x01000013", type: "1"};
+            document.keystrokes["ArrowDown"] = {keystroke : "0x01000015", type: "1"};
+            document.keystrokes["Enter"] = {keystroke : "0x01000005", type: "1"};
+            document.keystrokes["Escape"] = {keystroke : "0x01000000", type: "1"};
+            document.keystrokes["Backspace"] = {keystroke : "0x01000003", type: "1"};
+            document.keystrokes["Clear"] = {keystroke : "0x0100000B", type: "1"};
+            document.keystrokes["Home"] = {keystroke : "0x01000010", type: "1"};
+            document.keystrokes["End"] = {keystroke : "0x01000011", type: "1"};
+            document.keystrokes["0"] = {keystroke : "0x30", type: "0"};
+            document.keystrokes["1"] = {keystroke : "0x31", type: "0"};
+            document.keystrokes["2"] = {keystroke : "0x32", type: "0"};
+            document.keystrokes["3"] = {keystroke : "0x33", type: "0"};
+            document.keystrokes["4"] = {keystroke : "0x34", type: "0"};
+            document.keystrokes["5"] = {keystroke : "0x35", type: "0"};
+            document.keystrokes["6"] = {keystroke : "0x36", type: "0"};
+            document.keystrokes["7"] = {keystroke : "0x37", type: "0"};
+            document.keystrokes["8"] = {keystroke : "0x38", type: "0"};
+            document.keystrokes["9"] = {keystroke : "0x39", type: "0"};
+
+            reload_screen();
+        }
+
+        function on_keypress(e) {
+            e = e || window.event;
+
+            console.log("Key pressed: " + e.key);
+
+            if (e.key in document.keystrokes) {
+                var xhttp = new XMLHttpRequest();
+                xhttp.onreadystatechange = function() {
+                    if (this.readyState == 4 && this.status == 200) {
+                        display_image(this.response);
+                    }
+                };
+
+                var args = document.keystrokes[e.key];
+                var uri = "/key?keystroke=" + args.keystroke + "&type=" + args.type;
+                xhttp.open("GET", uri, true);
+                xhttp.send();
+            }
+        }
+
+    </script>
+</header>
+
+<body onload="init()" onkeydown="return on_keypress();">
+<canvas id="canvas" width="720" height="576">
+
+</canvas>
+
+</body>
+</html>
