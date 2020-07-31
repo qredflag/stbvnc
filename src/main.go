@@ -1,8 +1,9 @@
 package main
 
 import (
-	"compress/gzip"
 	"fmt"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
 	"os"
@@ -68,7 +69,13 @@ func HandleEventInjection(w http.ResponseWriter, r *http.Request) {
 	cmd.Start()
 }
 
+const SCREEN_WIDTH = 1920
+const SCREEN_HEIGHT = 1080
+
 func HandleFBRequest(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-type", "image/png")
+	w.Header().Add("Content-Disposition", "attachment; filename=\"fb.png\"")
+
 	file, err := os.Open("/dev/fb0")
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -76,33 +83,19 @@ func HandleFBRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	w.Header().Add("Content-type", "application/octet-stream")
-	w.Header().Add("Content-Encoding", "gzip")
-	w.Header().Add("Content-Disposition", "attachment; filename=\"fb.raw\"")
+	img := image.NewNRGBA(image.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+	io.LimitReader(file, SCREEN_WIDTH*SCREEN_HEIGHT*4).Read(img.Pix)
 
-	buffer := make([]byte, 65536)
+	//convert BGRA to RGBA
+	for offset := 0; offset < SCREEN_WIDTH*SCREEN_HEIGHT*4; offset += 4 {
+		img.Pix[offset], img.Pix[offset+2] = img.Pix[offset+2], img.Pix[offset]
+	}
 
-	writer, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
-	if err != nil {
+	enc := &png.Encoder{CompressionLevel: png.BestSpeed}
+
+	encode_error := enc.Encode(w, img)
+	if encode_error != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	defer writer.Close()
-
-	for {
-		bytes_count, read_error := file.Read(buffer)
-		if read_error != nil {
-			if read_error != io.EOF {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-			break
-		}
-		_, write_error := writer.Write(buffer[:bytes_count])
-		if write_error != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-	}
-
 }
