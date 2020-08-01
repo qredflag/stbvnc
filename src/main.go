@@ -12,39 +12,11 @@ import (
 )
 
 func main() {
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs)
 	http.HandleFunc("/key", HandleEventInjection)
 	http.HandleFunc("/fb", HandleFBRequest)
-	http.HandleFunc("/", HandleIndexRequest)
-
 	_ = http.ListenAndServe(":8080", nil)
-}
-
-func HandleIndexRequest(w http.ResponseWriter, r *http.Request) {
-	file, err := os.Open("index.html")
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	buffer := make([]byte, 65536)
-
-	for {
-		_, read_error := file.Read(buffer)
-		if read_error != nil {
-			if read_error != io.EOF {
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
-			break
-		}
-		_, write_error := w.Write(buffer)
-		if write_error != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-	}
-
 }
 
 func HandleEventInjection(w http.ResponseWriter, r *http.Request) {
